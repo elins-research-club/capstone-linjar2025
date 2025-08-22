@@ -12,6 +12,7 @@ try:
         if ser.in_waiting > 0:   # check if data is available
             line = ser.readline().decode('utf-8').strip()  # read line
             print(f"Received: {line}")
+            sensor_value = float(line.split(";")) # parsed values sensor[]
 
 except KeyboardInterrupt:
     print("\nStopped by user.")
