@@ -1,3 +1,10 @@
+static boolean newDataReady = 0;
+const int serialPrintInterval = 0; //increase value to slow down serial print activity
+#define NUM_SAMPLES_weight 100   // number of samples for moving average_weight
+int readings_weight[NUM_SAMPLES_weight];   // array to store readings_weight
+int index_weight = 0;               // current index_weight
+long total_weight = 0;              // running total_weight
+
 void loadcell_setup(){
   Serial.println("Load cell starting...");
 
@@ -15,18 +22,18 @@ void loadcell_setup(){
   LoadCell.start(stabilizingtime, _tare);
   if (LoadCell.getTareTimeoutFlag()) {
     Serial.println("Timeout, check MCU>HX711 wiring and pin designations");
-    while (1);
+    // while (1);
   }
   else {
     LoadCell.setCalFactor(calibrationValue); // set calibration value (float)
     Serial.println("Startup is complete");
   }
+
+  newDataReady = 0;
 }
 
-void loadcell_read(){
-  static boolean newDataReady = 0;
-  const int serialPrintInterval = 0; //increase value to slow down serial print activity
-
+void loadcell_read_one(){
+  newDataReady = 0;
   // check for new data/start next conversion:
   if (LoadCell.update()) newDataReady = true;
 
@@ -51,5 +58,53 @@ void loadcell_read(){
   if (LoadCell.getTareStatus() == true) {
     Serial.println("Tare complete");
   }
+}
 
+void loadcell_read_average(){
+  index_weight = 0;               // current index_weight
+  total_weight = 0;              // running total_weight
+
+  while(1){
+    newDataReady = 0;
+    // check for new data/start next conversion:
+    if (LoadCell.update()) newDataReady = true;
+
+      if (newDataReady) {
+      // read new value from sensor
+      readings_weight[index_weight] = LoadCell.getData();
+
+      // add new reading to total_weight
+      total_weight += readings_weight[index_weight];
+
+      // move to next index_weight
+      index_weight++;
+
+      // wrap around when reaching the end
+      if (index_weight >= NUM_SAMPLES_weight){
+        index_weight = 0;
+        break;
+      }
+      // calculate moving average_weight
+      average_weight = (float)total_weight / NUM_SAMPLES_weight;
+
+      // print results
+      Serial.print("Raw: ");
+      Serial.print(readings_weight[index_weight]);
+      Serial.print("  Average: ");
+      Serial.println(average_weight);
+    }
+
+    // receive command from serial terminal, send 't' to initiate tare operation:
+    if (Serial.available() > 0) {
+      char inByte = Serial.read();
+      if (inByte == 't') LoadCell.tareNoDelay();
+    }
+
+    // check if last tare operation is complete:
+    if (LoadCell.getTareStatus() == true) {
+      Serial.println("Tare complete");
+    }
+  }
+
+  delay(10);  // adjust sampling rate as needed
 }
